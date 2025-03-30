@@ -5,7 +5,8 @@
 #include "MSDriverMaster.h"
 #include "common.h"
 #include "config.h"
-#include "i2cMaster.h" // I2C通信
+#include "freertos/FreeRTOS.h" // 多线程
+#include "i2cMaster.h"         // I2C通信
 
 I2C_Master _i2c;
 
@@ -13,11 +14,14 @@ I2C_Master _i2c;
 MSDriverMaster _MSDriverMaster;
 int _Task = 0;            // 任务（1:排空 2：装货 3~6:送货 7:测试1 8:测试2）
 volatile int _Select = 1; // 选择项 1~8  (使用volatile，因为会在中断中修改)
+// 为0时数码管会闪烁——调整旋转编码器时会设置该值，使不闪烁
+volatile int _ledCnt = 0;
 
 void initMSDriver();
 void showLed(int val);
 void handleEncoder();
 int buttonDown();
+void taskDisplay(void *param);
 
 void setup() {
     Serial.begin(115200); // 初始化串口
@@ -45,22 +49,27 @@ void setup() {
     _MSDriverMaster.motor(1, 100);
     _MSDriverMaster.motor(2, 100);
     _MSDriverMaster.motor(3, 100);
+
+    xTaskCreatePinnedToCore(taskDisplay, "taskDisplay", 2048, NULL, 15, NULL,
+                            0);
 }
 
-// 主任务
+// 主任务,交互
+// 读取控制信号
+// 执行动作
+// 启动任务
 void loop() {
 
-    static int ledFlash = 0;
     static unsigned long t0 = 0;
 
-    int offset; // 旋转编码器读取结果
     // 读取选择编码器按钮
     // 选中的选项作为下一个任务
     if (buttonDown()) {
         _Task = _Select;
     }
 
-    // 之后的程序每50ms才运行一次
+    // 之后的程序每10ms才运行一次
+    // 会影响到数码管的亮度
     if (!timePassed(t0, 10)) {
         return;
     }
@@ -68,88 +77,108 @@ void loop() {
     // readXunJiChuanGanQi();
     // readWeiDongKaiGuan();
 
-    if (_Task == 0) {
-        // 不执行任务时： 指示灯闪烁
-        ledFlash = 1 - ledFlash;
-        if (ledFlash) {
-            showLed(_Select);
-        } else {
-            showLed(-1);
-        }
-    } else {
-        // 执行任务时： 指示灯常亮
-        showLed(_Select);
-    }
     if (_Task) {
         delay(2000);
         _Task = 0;
     }
+}
+// if (_Task == 1) { // 排空
+//     displayMode = 0;
+//     empty();
+//     _Task = 0;
+// } else if (_Task == 2) { // 装货
+//     displayMode = 0;
+//     renwu1();
 
-    // if (_Task == 1) { // 排空
-    //     displayMode = 0;
-    //     empty();
-    //     _Task = 0;
-    // } else if (_Task == 2) { // 装货
-    //     displayMode = 0;
-    //     renwu1();
+//     if (digitalRead(PIN_MODE_TEST)) {
+//         _Task = 0;
+//     } else {
+//         _Task++;
+//     }
 
-    //     if (digitalRead(PIN_MODE_TEST)) {
-    //         _Task = 0;
-    //     } else {
-    //         _Task++;
-    //     }
+// } else if (_Task == 3) { // 起点送货
+//     displayMode = 0;
+//     renwu2_1();
+//     if (digitalRead(PIN_MODE_TEST)) {
+//         _Task = 0;
+//     } else {
+//         _Task++;
+//     }
+//     _Select = _Task;
+// } else if (_Task == 4) { // 中间1送货
+//     displayMode = 0;
+//     renwu2_2();
+//     if (digitalRead(PIN_MODE_TEST)) {
+//         _Task = 0;
+//     } else {
+//         _Task++;
+//     }
+//     _Select = _Task;
+// } else if (_Task == 5) { // 中间2送货
+//     displayMode = 0;
+//     renwu3_1();
+//     if (digitalRead(PIN_MODE_TEST)) {
+//         _Task = 0;
+//     } else {
+//         _Task++;
+//     }
+//     _Select = _Task;
+// } else if (_Task == 6) { // 中间3送货
+//     displayMode = 0;
+//     renwu3_2();
+//     _Task = 0;
+//     _Select = _Task;
+// } else if (_Task == 7) { // 测试
+//     displayMode = 0;
+//     Test1();
 
-    // } else if (_Task == 3) { // 起点送货
-    //     displayMode = 0;
-    //     renwu2_1();
-    //     if (digitalRead(PIN_MODE_TEST)) {
-    //         _Task = 0;
-    //     } else {
-    //         _Task++;
-    //     }
-    //     _Select = _Task;
-    // } else if (_Task == 4) { // 中间1送货
-    //     displayMode = 0;
-    //     renwu2_2();
-    //     if (digitalRead(PIN_MODE_TEST)) {
-    //         _Task = 0;
-    //     } else {
-    //         _Task++;
-    //     }
-    //     _Select = _Task;
-    // } else if (_Task == 5) { // 中间2送货
-    //     displayMode = 0;
-    //     renwu3_1();
-    //     if (digitalRead(PIN_MODE_TEST)) {
-    //         _Task = 0;
-    //     } else {
-    //         _Task++;
-    //     }
-    //     _Select = _Task;
-    // } else if (_Task == 6) { // 中间3送货
-    //     displayMode = 0;
-    //     renwu3_2();
-    //     _Task = 0;
-    //     _Select = _Task;
-    // } else if (_Task == 7) { // 测试
-    //     displayMode = 0;
-    //     Test1();
+//     displayMode = 0;
+//     sleep(20);
+//     oled.clearDisplay(); // 清屏
+//     oled.display();
+//     _Task = 0;
 
-    //     displayMode = 0;
-    //     sleep(20);
-    //     oled.clearDisplay(); // 清屏
-    //     oled.display();
-    //     _Task = 0;
+// } else if (_Task == 8) { // 测试2
+//     displayMode = 0;
+//     Test8();
+//     displayMode = 0;
+//     sleep(20);
+//     oled.clearDisplay(); // 清屏
+//     oled.display();
+//     _Task = 0;
+// }
 
-    // } else if (_Task == 8) { // 测试2
-    //     displayMode = 0;
-    //     Test8();
-    //     displayMode = 0;
-    //     sleep(20);
-    //     oled.clearDisplay(); // 清屏
-    //     oled.display();
-    //     _Task = 0;
-    // }
+// 从任务
+// 数码管显示
+void taskDisplay(void *param) {
+    // 数码管每0.5s左右闪烁一次——闪烁频率
+    int ledFlash = 0; // 闪烁
+    int ledFlashCnt = 0;
+
+    // Loop forever
+    for (;;) {
+        if (_Task == 0 && _ledCnt == 0) {
+            // 不执行任务时： 指示灯闪烁
+            if (ledFlashCnt-- == 0) {
+                ledFlash = 1 - ledFlash;
+                ledFlashCnt = 200;
+            }
+            if (ledFlash) {
+                showLed(_Select);
+            } else {
+                showLed(-1);
+            }
+        } else {
+            // 执行任务时： 指示灯常亮
+            showLed(_Select);
+        }
+
+        if (_ledCnt) {
+            _ledCnt--;
+        }
+
+        delay(2);
+    }
 }
 
 // 4电机闭环控制，舵机全开
@@ -159,9 +188,12 @@ void initMSDriver() {
 
     uint8_t smode = 0b11; // 舵机模式
     _MSDriverMaster.init(0x32);
-    _MSDriverMaster.setMotorMode(-1, motorMode);            // 设置所有电机工作模式
-    _MSDriverMaster.setMotorPID(-1, 0.6, 0.000001, 0, 2.8); // 设置所有电机PID参数
-    _MSDriverMaster.setServoMode(-1, smode);                // 设置所有舵机工作模式
+    // 设置所有电机工作模式
+    _MSDriverMaster.setMotorMode(-1, motorMode);
+    // 设置所有电机PID参数
+    _MSDriverMaster.setMotorPID(-1, 0.6, 0.000001, 0, 2.8);
+    // 设置所有舵机工作模式
+    _MSDriverMaster.setServoMode(-1, smode);
     _MSDriverMaster.sendCmd(APPLY);
 }
 
@@ -192,17 +224,39 @@ unsigned char smgduan[] = {
 
 void showLed(int val) {
 
+    static int ledFreq = 10;   // 频闪——每被调用10次点亮一次——控制亮度
+    static int ledFreqCnt = 0; //
+
     unsigned char gewei = 20;
     unsigned char shiwei = 20;
-    if (val >= 0) {
-        gewei = (val % 100) % 10;
-        shiwei = (val % 100) / 10;
+
+    if (ledFreqCnt == ledFreq || val == -1) {
+        // 熄灭
+        digitalWrite(PIN_LED_LOAD, LOW); // 低电位表示启动
+        shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[20]);
+        shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[20]);
+        digitalWrite(PIN_LED_LOAD, HIGH); // 高电位表示停止
     }
 
-    digitalWrite(PIN_LED_LOAD, LOW); // 低电位表示启动
-    shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[gewei]);
-    shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[shiwei]);
-    digitalWrite(PIN_LED_LOAD, HIGH); // 高电位表示停止
+    if (ledFreqCnt-- == 0) {
+
+        if (val >= 0) {
+            gewei = (val % 100) % 10;
+            shiwei = (val % 100) / 10;
+
+            // 十位上的0不显示
+            if (shiwei == 0) {
+                shiwei = 20;
+            }
+        }
+
+        digitalWrite(PIN_LED_LOAD, LOW); // 低电位表示启动
+        shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[gewei]);
+        shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[shiwei]);
+        digitalWrite(PIN_LED_LOAD, HIGH); // 高电位表示停止
+
+        ledFreqCnt = ledFreq;
+    }
 }
 
 void handleEncoder() {
@@ -210,6 +264,7 @@ void handleEncoder() {
     static unsigned long lastDebounceTime = 0;
     static unsigned long debounceDelay = 1000; // 微秒
     static int position = 0;
+    int diff = 0;
 
     // 如果正在执行任务，则不读取
     if (_Task) {
@@ -233,7 +288,16 @@ void handleEncoder() {
     } else {
         position++; // 逆时针
     }
-    _Select = position / 2;
+    diff = position / 2;
+    if (diff) {
+        _Select += diff;
+        position = 0;
+
+        _Select = _Select < 8 ? _Select : 0;
+        _Select = _Select >= 0 ? _Select : 7;
+    }
+
+    _ledCnt = 300; // 数码管暂时不闪烁
 }
 
 int buttonDown() {
