@@ -227,19 +227,19 @@ void showLed(int val) {
     static int ledFreq = 10;   // 频闪——每被调用10次点亮一次——控制亮度
     static int ledFreqCnt = 0; //
 
-    unsigned char gewei = 20;
-    unsigned char shiwei = 20;
-
-    if (ledFreqCnt == ledFreq || val == -1) {
+    if (ledFreqCnt == ledFreq) {
         // 熄灭
         digitalWrite(PIN_LED_LOAD, LOW); // 低电位表示启动
         shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[20]);
         shiftOut(PIN_LED_D, PIN_LED_CLK, MSBFIRST, smgduan[20]);
         digitalWrite(PIN_LED_LOAD, HIGH); // 高电位表示停止
-    }
-
-    if (ledFreqCnt-- == 0) {
-
+        ledFreqCnt--;
+    } else if (ledFreqCnt-- == 0) {
+        // 默认不显示
+        unsigned char gewei = 20;
+        unsigned char shiwei = 20;
+        
+        // 只显示大于0的数
         if (val >= 0) {
             gewei = (val % 100) % 10;
             shiwei = (val % 100) / 10;
