@@ -7,8 +7,11 @@
 #include "config.h"
 #include "freertos/FreeRTOS.h" // 多线程
 #include "i2cMaster.h"         // I2C通信
+#include <Adafruit_SSD1306.h>  // OLED显示屏
 
 I2C_Master _i2c;
+// OLED显示屏
+Adafruit_SSD1306 oled32(128, 32, &Wire, -1);
 
 // 电机驱动模块
 MSDriverMaster _MSDriverMaster;
@@ -41,14 +44,22 @@ void setup() {
 
     // 等待其它设备上电完毕
     delay(1000);
+    oled32.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    oled32.clearDisplay(); // 清屏
+    oled32.setTextSize(2);
+    oled32.setTextColor(SSD1306_WHITE);
+    oled32.setCursor(40, 16);
+    oled32.println("init...");
+    oled32.display(); // 显示
+    oled32.setTextSize(1);
 
     initMSDriver();
 
     delay(1000);
-    _MSDriverMaster.motor(0, 100);
-    _MSDriverMaster.motor(1, 100);
-    _MSDriverMaster.motor(2, 100);
-    _MSDriverMaster.motor(3, 100);
+    // _MSDriverMaster.motor(0, 100);
+    // _MSDriverMaster.motor(1, 100);
+    // _MSDriverMaster.motor(2, 100);
+    // _MSDriverMaster.motor(3, 100);
 
     xTaskCreatePinnedToCore(taskDisplay, "taskDisplay", 2048, NULL, 15, NULL,
                             0);
@@ -59,7 +70,7 @@ void setup() {
 // 执行动作
 // 启动任务
 void loop() {
-
+    static char str[20];
     static unsigned long t0 = 0;
 
     // 读取选择编码器按钮
@@ -74,6 +85,24 @@ void loop() {
         return;
     }
 
+    int32_t speed0 = 0;
+    int32_t speed1 = 0;
+    int32_t speed2 = 0;
+    int32_t speed3 = 0;
+    _MSDriverMaster.getValueM(0, &speed0);
+    _MSDriverMaster.getValueM(1, &speed1);
+    _MSDriverMaster.getValueM(2, &speed2);
+    _MSDriverMaster.getValueM(3, &speed3);
+
+    oled32.clearDisplay(); // 清屏
+    sprintf(str, "%7d %7d\n", speed0, speed1);
+    oled32.setCursor(10, 4);
+    oled32.println(str);
+    sprintf(str, "%7d %7d\n", speed2, speed3);
+    oled32.setCursor(10, 20);
+    oled32.println(str);
+    oled32.display(); // 显示
+
     // readXunJiChuanGanQi();
     // readWeiDongKaiGuan();
 
@@ -82,6 +111,7 @@ void loop() {
         _Task = 0;
     }
 }
+
 // if (_Task == 1) { // 排空
 //     displayMode = 0;
 //     empty();
@@ -238,7 +268,7 @@ void showLed(int val) {
         // 默认不显示
         unsigned char gewei = 20;
         unsigned char shiwei = 20;
-        
+
         // 只显示大于0的数
         if (val >= 0) {
             gewei = (val % 100) % 10;
