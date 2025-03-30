@@ -23,7 +23,7 @@ void MSDriverMaster::sendCmd(MSD_CMD cmd)
 
  电机工作模式
     s7:测速使能位
-    s3:电机使能位
+    s3:电机禁用位
     0xxx xxxx: 默认 无需测速，相应的AB引脚作为IO口
         0xxx x000: 相应的A脚作为数字输入 INPUT
         0xxx x001: 相应的A脚作为模拟输入 INPUT
