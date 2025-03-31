@@ -110,7 +110,7 @@ void loop() {
         delay(2000);
         _Task = 0;
     }
-}
+
 
 // if (_Task == 1) { // 排空
 //     displayMode = 0;
@@ -177,6 +177,8 @@ void loop() {
 //     oled.display();
 //     _Task = 0;
 // }
+
+}
 
 // 从任务
 // 数码管显示

@@ -1,8 +1,8 @@
 
 
 // I2C
-#define I2C_SCL 40
-#define I2C_SDA 39
+#define I2C_SCL 39
+#define I2C_SDA 40
 #define I2C_FREQ 200000
 
 // LED 显示工作状态
