@@ -2,19 +2,27 @@
   CPU:  ESP32-S3
 */
 
+#include "GameSir.h"
 #include "MSDriverMaster.h"
+#include "MyBle.h"
 #include "common.h"
 #include "config.h"
 #include "freertos/FreeRTOS.h" // 多线程
 #include "i2cMaster.h"         // I2C通信
+#include <Adafruit_NeoPixel.h> // RGB LED灯
 #include <Adafruit_SSD1306.h>  // OLED显示屏
 
 I2C_Master _i2c;
 // OLED显示屏
 Adafruit_SSD1306 oled32(128, 32, &Wire, -1);
-
+Adafruit_SSD1306 oled64(128, 64, &Wire, -1);
+// RGB LED
+Adafruit_NeoPixel rgbLED(1, 48, NEO_GRB + NEO_KHZ800);
+// 蓝牙
+MyBleClient *pMyBleClient;
 // 电机驱动模块
 MSDriverMaster _MSDriverMaster;
+
 int _Task = 0;            // 任务（1:排空 2：装货 3~6:送货 7:测试1 8:测试2）
 volatile int _Select = 1; // 选择项 1~8  (使用volatile，因为会在中断中修改)
 // 为0时数码管会闪烁——调整旋转编码器时会设置该值，使不闪烁
@@ -35,6 +43,10 @@ void setup() {
     pinMode(PIN_LED_CLK, OUTPUT);
     pinMode(PIN_LED_LOAD, OUTPUT);
 
+    // RGB LED灯
+    rgbLED.begin();
+    rgbLED.setBrightness(20);
+
     // 旋转编码器
     pinMode(PIN_CODE_CLK, INPUT);       // 时钟
     pinMode(PIN_CODE_D, INPUT);         // 数据
@@ -44,7 +56,12 @@ void setup() {
 
     // 等待其它设备上电完毕
     delay(1000);
-    oled32.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+
+    // 初始化OLED
+    oled32.begin(SSD1306_SWITCHCAPVCC, 0x3D);
+    oled64.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    oled64.setRotation(2); // 上下翻转显示
+
     oled32.clearDisplay(); // 清屏
     oled32.setTextSize(2);
     oled32.setTextColor(SSD1306_WHITE);
@@ -53,13 +70,26 @@ void setup() {
     oled32.display(); // 显示
     oled32.setTextSize(1);
 
+    oled64.clearDisplay(); // 清屏
+    oled64.setTextSize(2);
+    oled64.setTextColor(SSD1306_WHITE);
+    oled64.setCursor(40, 16);
+    oled64.println("init...");
+    oled64.display(); // 显示
+    oled64.setTextSize(1);
+
+    // 初始化电机驱动模块
     initMSDriver();
 
-    delay(1000);
     // _MSDriverMaster.motor(0, 100);
     // _MSDriverMaster.motor(1, 100);
     // _MSDriverMaster.motor(2, 100);
     // _MSDriverMaster.motor(3, 100);
+
+    // 蓝牙
+    pMyBleClient = MyBleClient::getInstance();
+    pMyBleClient->init();
+    pMyBleClient->autoConnect(); // 自动连接
 
     xTaskCreatePinnedToCore(taskDisplay, "taskDisplay", 2048, NULL, 15, NULL,
                             0);
@@ -111,73 +141,71 @@ void loop() {
         _Task = 0;
     }
 
+    // if (_Task == 1) { // 排空
+    //     displayMode = 0;
+    //     empty();
+    //     _Task = 0;
+    // } else if (_Task == 2) { // 装货
+    //     displayMode = 0;
+    //     renwu1();
 
-// if (_Task == 1) { // 排空
-//     displayMode = 0;
-//     empty();
-//     _Task = 0;
-// } else if (_Task == 2) { // 装货
-//     displayMode = 0;
-//     renwu1();
+    //     if (digitalRead(PIN_MODE_TEST)) {
+    //         _Task = 0;
+    //     } else {
+    //         _Task++;
+    //     }
 
-//     if (digitalRead(PIN_MODE_TEST)) {
-//         _Task = 0;
-//     } else {
-//         _Task++;
-//     }
+    // } else if (_Task == 3) { // 起点送货
+    //     displayMode = 0;
+    //     renwu2_1();
+    //     if (digitalRead(PIN_MODE_TEST)) {
+    //         _Task = 0;
+    //     } else {
+    //         _Task++;
+    //     }
+    //     _Select = _Task;
+    // } else if (_Task == 4) { // 中间1送货
+    //     displayMode = 0;
+    //     renwu2_2();
+    //     if (digitalRead(PIN_MODE_TEST)) {
+    //         _Task = 0;
+    //     } else {
+    //         _Task++;
+    //     }
+    //     _Select = _Task;
+    // } else if (_Task == 5) { // 中间2送货
+    //     displayMode = 0;
+    //     renwu3_1();
+    //     if (digitalRead(PIN_MODE_TEST)) {
+    //         _Task = 0;
+    //     } else {
+    //         _Task++;
+    //     }
+    //     _Select = _Task;
+    // } else if (_Task == 6) { // 中间3送货
+    //     displayMode = 0;
+    //     renwu3_2();
+    //     _Task = 0;
+    //     _Select = _Task;
+    // } else if (_Task == 7) { // 测试
+    //     displayMode = 0;
+    //     Test1();
 
-// } else if (_Task == 3) { // 起点送货
-//     displayMode = 0;
-//     renwu2_1();
-//     if (digitalRead(PIN_MODE_TEST)) {
-//         _Task = 0;
-//     } else {
-//         _Task++;
-//     }
-//     _Select = _Task;
-// } else if (_Task == 4) { // 中间1送货
-//     displayMode = 0;
-//     renwu2_2();
-//     if (digitalRead(PIN_MODE_TEST)) {
-//         _Task = 0;
-//     } else {
-//         _Task++;
-//     }
-//     _Select = _Task;
-// } else if (_Task == 5) { // 中间2送货
-//     displayMode = 0;
-//     renwu3_1();
-//     if (digitalRead(PIN_MODE_TEST)) {
-//         _Task = 0;
-//     } else {
-//         _Task++;
-//     }
-//     _Select = _Task;
-// } else if (_Task == 6) { // 中间3送货
-//     displayMode = 0;
-//     renwu3_2();
-//     _Task = 0;
-//     _Select = _Task;
-// } else if (_Task == 7) { // 测试
-//     displayMode = 0;
-//     Test1();
+    //     displayMode = 0;
+    //     sleep(20);
+    //     oled.clearDisplay(); // 清屏
+    //     oled.display();
+    //     _Task = 0;
 
-//     displayMode = 0;
-//     sleep(20);
-//     oled.clearDisplay(); // 清屏
-//     oled.display();
-//     _Task = 0;
-
-// } else if (_Task == 8) { // 测试2
-//     displayMode = 0;
-//     Test8();
-//     displayMode = 0;
-//     sleep(20);
-//     oled.clearDisplay(); // 清屏
-//     oled.display();
-//     _Task = 0;
-// }
-
+    // } else if (_Task == 8) { // 测试2
+    //     displayMode = 0;
+    //     Test8();
+    //     displayMode = 0;
+    //     sleep(20);
+    //     oled.clearDisplay(); // 清屏
+    //     oled.display();
+    //     _Task = 0;
+    // }
 }
 
 // 从任务
@@ -187,8 +215,12 @@ void taskDisplay(void *param) {
     int ledFlash = 0; // 闪烁
     int ledFlashCnt = 0;
 
+    unsigned long t0 = millis();
+    int s = 0;
+
     // Loop forever
     for (;;) {
+        // 数码管
         if (_Task == 0 && _ledCnt == 0) {
             // 不执行任务时： 指示灯闪烁
             if (ledFlashCnt-- == 0) {
@@ -208,6 +240,25 @@ void taskDisplay(void *param) {
         if (_ledCnt) {
             _ledCnt--;
         }
+
+        // RGB灯
+        // 每10ms执行
+        //if (timePassed(t0, 500)) {
+            if (s) {
+                if (pMyBleClient->isConnected()) {
+                    // 闪蓝灯
+                    rgbLED.setPixelColor(0, rgbLED.Color(50, 50, 200));
+                } else {
+                    // 闪红灯
+                    rgbLED.setPixelColor(0, rgbLED.Color(200, 50, 50));
+                }
+                s = 0;
+            } else {
+                rgbLED.setPixelColor(0, rgbLED.Color(0, 0, 0));
+                s = 1;
+            }
+            rgbLED.show();
+        //}
 
         delay(2);
     }
