@@ -58,8 +58,8 @@ void setup() {
     delay(1000);
 
     // 初始化OLED
-    oled32.begin(SSD1306_SWITCHCAPVCC, 0x3D);
-    oled64.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    oled32.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    oled64.begin(SSD1306_SWITCHCAPVCC, 0x3D);
     oled64.setRotation(2); // 上下翻转显示
 
     oled32.clearDisplay(); // 清屏
