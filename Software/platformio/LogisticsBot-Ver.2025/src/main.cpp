@@ -42,6 +42,7 @@ void setup() {
     pinMode(PIN_LED_D, OUTPUT);
     pinMode(PIN_LED_CLK, OUTPUT);
     pinMode(PIN_LED_LOAD, OUTPUT);
+    showLed(-1);    // 数码管不显示
 
     // RGB LED灯
     rgbLED.begin();
@@ -55,7 +56,7 @@ void setup() {
     attachInterrupt(PIN_CODE_CLK, handleEncoder, CHANGE);
 
     // 等待其它设备上电完毕
-    delay(1000);
+    delay(200);
 
     // 初始化OLED
     oled32.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -81,18 +82,25 @@ void setup() {
     // 初始化电机驱动模块
     initMSDriver();
 
-    // _MSDriverMaster.motor(0, 100);
-    // _MSDriverMaster.motor(1, 100);
-    // _MSDriverMaster.motor(2, 100);
-    // _MSDriverMaster.motor(3, 100);
+    _MSDriverMaster.motor(0, 180);
+    _MSDriverMaster.motor(1, -180);
+    _MSDriverMaster.motor(2, 180);
+    _MSDriverMaster.motor(3, -180);
 
     // 蓝牙
     pMyBleClient = MyBleClient::getInstance();
     pMyBleClient->init();
     pMyBleClient->autoConnect(); // 自动连接
 
+    // 子线程：显示状态
     xTaskCreatePinnedToCore(taskDisplay, "taskDisplay", 2048, NULL, 15, NULL,
                             0);
+
+    // 结束初始化
+    oled32.clearDisplay(); // 清屏
+    oled32.display(); // 显示
+    oled64.clearDisplay(); // 清屏
+    oled64.display(); // 显示
 }
 
 // 主任务,交互
@@ -243,21 +251,21 @@ void taskDisplay(void *param) {
 
         // RGB灯
         // 每10ms执行
-        //if (timePassed(t0, 500)) {
-            if (s) {
-                if (pMyBleClient->isConnected()) {
-                    // 闪蓝灯
-                    rgbLED.setPixelColor(0, rgbLED.Color(50, 50, 200));
-                } else {
-                    // 闪红灯
-                    rgbLED.setPixelColor(0, rgbLED.Color(200, 50, 50));
-                }
-                s = 0;
+        // if (timePassed(t0, 500)) {
+        if (s) {
+            if (pMyBleClient->isConnected()) {
+                // 闪蓝灯
+                rgbLED.setPixelColor(0, rgbLED.Color(50, 50, 200));
             } else {
-                rgbLED.setPixelColor(0, rgbLED.Color(0, 0, 0));
-                s = 1;
+                // 闪红灯
+                rgbLED.setPixelColor(0, rgbLED.Color(200, 50, 50));
             }
-            rgbLED.show();
+            s = 0;
+        } else {
+            rgbLED.setPixelColor(0, rgbLED.Color(0, 0, 0));
+            s = 1;
+        }
+        rgbLED.show();
         //}
 
         delay(2);
@@ -274,7 +282,9 @@ void initMSDriver() {
     // 设置所有电机工作模式
     _MSDriverMaster.setMotorMode(-1, motorMode);
     // 设置所有电机PID参数
-    _MSDriverMaster.setMotorPID(-1, 0.6, 0.000001, 0, 2.8);
+    // 176RPM电机：分辨率11，转速系数2.25
+    _MSDriverMaster.setMotorPID(-1, 2, 0.00017, 16, 2.25);
+    _MSDriverMaster.setMotorPID(2, 2, 0.00016, 16, 2.25);
     // 设置所有舵机工作模式
     _MSDriverMaster.setServoMode(-1, smode);
     _MSDriverMaster.sendCmd(APPLY);
