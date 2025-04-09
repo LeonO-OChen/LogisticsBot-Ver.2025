@@ -112,10 +112,7 @@ typedef struct {
         1xxx xxx0: 无PID控制
         11xx xxx1: 需PID控制
     */
-    uint8_t m0Mode; /* 电机工作模式(M0) */
-    uint8_t m1Mode; /* 电机工作模式(M1) */
-    uint8_t m2Mode; /* 电机工作模式(M2) */
-    uint8_t m3Mode; /* 电机工作模式(M3) */
+    uint8_t mMode[4]; /* 电机工作模式(M0~M3) */
 
     /* 舵机工作模式
     00:默认 INPUT
