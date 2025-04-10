@@ -42,7 +42,7 @@ void setup() {
     pinMode(PIN_LED_D, OUTPUT);
     pinMode(PIN_LED_CLK, OUTPUT);
     pinMode(PIN_LED_LOAD, OUTPUT);
-    showLed(-1);    // 数码管不显示
+    showLed(-1); // 数码管不显示
 
     // RGB LED灯
     rgbLED.begin();
@@ -93,14 +93,13 @@ void setup() {
     pMyBleClient->autoConnect(); // 自动连接
 
     // 子线程：显示状态
-    xTaskCreatePinnedToCore(taskDisplay, "taskDisplay", 2048, NULL, 15, NULL,
-                            0);
+    xTaskCreatePinnedToCore(taskDisplay, "taskDisplay", 2048, NULL, 15, NULL, 0);
 
     // 结束初始化
     oled32.clearDisplay(); // 清屏
-    oled32.display(); // 显示
+    oled32.display();      // 显示
     oled64.clearDisplay(); // 清屏
-    oled64.display(); // 显示
+    oled64.display();      // 显示
 }
 
 // 主任务,交互
