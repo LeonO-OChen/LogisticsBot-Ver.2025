@@ -273,8 +273,8 @@ void taskDisplay(void *param) {
 
 // 4电机闭环控制，舵机全开
 void initMSDriver() {
-    // uint8_t motorMode = 0b11000001; // 测速，计数自动清零，PID控制
-    uint8_t motorMode = 0b11000000; // 测速，计数自动清零，无PID控制
+    uint8_t motorMode = 0b11000001; // 测速，计数自动清零，PID控制
+    //uint8_t motorMode = 0b11000000; // 测速，计数自动清零，无PID控制
 
     uint8_t smode = 0b11; // 舵机模式
     _MSDriverMaster.init(0x32);
@@ -283,7 +283,6 @@ void initMSDriver() {
     // 设置所有电机PID参数
     // 176RPM电机：分辨率11，转速系数2.25
     _MSDriverMaster.setMotorPID(-1, 2, 0.00017, 16, 2.25);
-    _MSDriverMaster.setMotorPID(2, 2, 0.00016, 16, 2.25);
     // 设置所有舵机工作模式
     _MSDriverMaster.setServoMode(-1, smode);
     _MSDriverMaster.sendCmd(APPLY);
