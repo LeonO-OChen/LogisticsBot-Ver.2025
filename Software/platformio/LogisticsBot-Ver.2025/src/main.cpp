@@ -282,7 +282,7 @@ void initMSDriver() {
     _MSDriverMaster.setMotorMode(-1, motorMode);
     // 设置所有电机PID参数
     // 176RPM电机：分辨率11，转速系数2.25
-    _MSDriverMaster.setMotorPID(-1, 2, 0.00017, 16, 2.25);
+    _MSDriverMaster.setMotorPID(-1, 2, 0.00046, 16, 2.25);
     // 设置所有舵机工作模式
     _MSDriverMaster.setServoMode(-1, smode);
     _MSDriverMaster.sendCmd(APPLY);
